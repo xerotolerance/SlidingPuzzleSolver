@@ -1,0 +1,4 @@
+C:\Users\thecm\.CLion2019.2\system\cygwin_cmake\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/cygwin64/bin/make.exe -DCMAKE_C_COMPILER=C:/cygwin64/bin/gcc.exe -G "CodeBlocks - Unix Makefiles" /cygdrive/c/Users/thecm/CLionProjects/SlidingPuzzleSolver
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /cygdrive/c/Users/thecm/CLionProjects/SlidingPuzzleSolver/cmake-build-debug
