@@ -2,6 +2,7 @@
 #include <vector>
 #include <map>
 #include <cassert>
+#include <iterator>
 
 using std::vector;
 using std::cout;
@@ -22,29 +23,40 @@ void operator delete(void * ptr){
 
 class SlidingPuzzleSolver{
 private:
-    class _Node{
+    class _GridNode{
         private:
             friend SlidingPuzzleSolver;
-            friend std::ostream& operator<<(std::ostream& os, const _Node& node){
+            friend std::ostream& operator<<(std::ostream& os, const _GridNode& node){
                 return os << node.val;
             };
-            _Node *up, *right, *down, *left;
+            _GridNode *up, *right, *down, *left;
             int val;
         public:
-            explicit _Node(int val=-1, _Node* up= nullptr, _Node* right= nullptr, _Node* down= nullptr, _Node* left= nullptr)
+            explicit _GridNode(int val=-1, _GridNode* up= nullptr, _GridNode* right= nullptr, _GridNode* down= nullptr, _GridNode* left= nullptr)
                 : val(val), up(up), right(right), down(down), left(left) {};
+
+            _GridNode (const _GridNode& orig): val(orig.val), up(orig.up), right(orig.right), down(orig.down), left(orig.left) {
+                cout << orig.val << " was copied!" << endl;
+            };
+
+            _GridNode(_GridNode&& src) noexcept
+                : val(std::exchange(src.val, -1)),
+                  up(std::exchange(src.up, nullptr)), right(std::exchange(src.right, nullptr)),
+                  down(std::exchange(src.down, nullptr)), left(std::exchange(src.left, nullptr)){
+                cout << this->val << " was moved!" << endl;
+            }
 
     };
     enum direction{UP=0, DOWN, LEFT, RIGHT};
 private:
     const std::vector<std::vector<int>>& _arr;
-    std::map<int, _Node> _lookup;
+    std::map<int, _GridNode> _lookup;
     std::vector<int> _movelist;
-    _Node *_p_entry_point;
+    _GridNode *_p_entry_point;
     const uint _map_size;
 private:
     void _print_board(const std::string& end_dec = "=============") const{
-        _Node* row_head = _p_entry_point, *item=nullptr;
+        _GridNode* row_head = _p_entry_point, *item=nullptr;
         while(row_head) {
             item = row_head;
             while (item){
@@ -56,11 +68,11 @@ private:
         }
         cout << end_dec << endl;
     }
-    void _hash_and_map() {
-        _Node *node_before=nullptr, *node_above=nullptr;
+    void _create_map() {
+        _GridNode *node_before=nullptr, *node_above=nullptr;
         for (const auto& row_it : _arr){
             for (const int& item : row_it){
-                _lookup.emplace( item, _Node(item, node_above, nullptr, nullptr, node_before));
+                _lookup.emplace( item, std::move(_GridNode(item, node_above, nullptr, nullptr, node_before)));
                 if (node_before) {
                     node_before->right = &_lookup.at(item);
                 }
@@ -76,79 +88,32 @@ private:
         }
         cout << '\0';
     }
-    void _swap(const int& x, const direction& x_moves){
-        _Node temp;
-        if (x_moves < LEFT){
-            if (_lookup[0].left)
-                _lookup[0].left->right = &_lookup[x];
-            if(_lookup[0].right)
-                _lookup[0].right->left = &_lookup[x];
-            if (_lookup[x].left)
-                _lookup[x].left->right = &_lookup[0];
-            if (_lookup[x].right)
-                _lookup[x].right->left = &_lookup[0];
-        }
-        else{
-            if(_lookup[0].up)
-                _lookup[0].up->down = &_lookup[x];
-            if(_lookup[0].down)
-                _lookup[0].down->up = &_lookup[x];
-            if(_lookup[x].up)
-                _lookup[x].up->down = &_lookup[0];
-            if(_lookup[x].down)
-                _lookup[x].down->up = &_lookup[0];
-        }
+    void _swap(const int& x){
+        //swap nodes' value fields
+        _lookup.at(0).val = x;
+        _lookup.at(x).val = 0;
 
-        temp.up = _lookup[0].up;
-        temp.down = _lookup[0].down;
-        temp.left = _lookup[0].left;
-        temp.right = _lookup[0].right;
+        //temporarily extract nodes & swap their placements in map
+        auto temp_x = _lookup.extract(x), temp_0 = _lookup.extract(0);
+        temp_0.key() = x;
+        temp_x.key() = 0;
 
-        _lookup[0].up = _lookup[x].up;
-        _lookup[0].down = _lookup[x].down;
-        _lookup[0].left = _lookup[x].left;
-        _lookup[0].right = _lookup[x].right;
+        //use iterators to make node re-insertion constant time
+        auto insert_before = ++_lookup.begin();
+        _lookup.insert(insert_before, std::move(temp_0)); //O(1) when told where to insert before
+        std::advance(insert_before, x);     // O(1) operation
+        _lookup.insert(insert_before, std::move(temp_x));
 
-        _lookup[x].up = temp.up;
-        _lookup[x].down = temp.down;
-        _lookup[x].left = temp.left;
-        _lookup[x].right = temp.right;
-
-        switch (x_moves){
-            case UP:
-                _lookup[x].down = &_lookup[0];
-                _lookup[0].up = &_lookup[x];
-                break;
-            case DOWN:
-                _lookup[x].up = &_lookup[0];
-                _lookup[0].down = &_lookup[x];
-                break;
-            case LEFT:
-                _lookup[x].right = &_lookup[0];
-                _lookup[0].left = &_lookup[x];
-                break;
-            case RIGHT:
-                _lookup[x].left = &_lookup[0];
-                _lookup[0].right = &_lookup[x];
-                break;
-        }
     }
 
     bool _swap_zero_with(const int& x) {
-        direction x_moves;
-        if (_lookup[0].up == &_lookup[x])
-            x_moves = DOWN;
-        else if (_lookup[0].right == &_lookup[x])
-            x_moves = LEFT;
-        else if (_lookup[0].down == &_lookup[x])
-            x_moves = UP;
-        else if (_lookup[0].left == &_lookup[x])
-            x_moves = RIGHT;
-        else
-            return false;
-
-        _swap(x, x_moves);
+        _swap(x);
+        if (_p_entry_point == &_lookup.at(x))
+            _p_entry_point = &_lookup[0];
+        else if (_p_entry_point == &_lookup.at(0))
+            _p_entry_point = &_lookup[x];
         _movelist.emplace_back(x);
+
         return true;
     }
 
@@ -156,13 +121,12 @@ public:
     explicit SlidingPuzzleSolver (const std::vector<std::vector<int>>& arr)
       : _arr(arr), _map_size(arr.size() * arr.size())
     {
-      _hash_and_map();
+      _create_map();
       _p_entry_point = &_lookup[arr[0][0]];
     }
 
     std::vector<int> solve(){
         _print_board();
-
         assert(_swap_zero_with(8) && "X is not adjacent to 0.\n");
         _print_board();
 

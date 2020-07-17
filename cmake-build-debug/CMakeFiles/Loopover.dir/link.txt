@@ -1,1 +1,0 @@
-C:/cygwin64/bin/c++.exe -g  -Wl,--enable-auto-import CMakeFiles/Loopover.dir/main.cpp.o  -o Loopover.exe -Wl,--out-implib,libLoopover.dll.a -Wl,--major-image-version,0,--minor-image-version,0 
