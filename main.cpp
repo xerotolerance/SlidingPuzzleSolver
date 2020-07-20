@@ -1,9 +1,12 @@
 #include <iostream>
 #include <vector>
-#include <map>
-#include <cassert>
+#include <unordered_map>
+#include <ctime>
+#include <cstdlib>
 #include <iterator>
+#include <unordered_set>
 
+using std::unordered_set;
 using std::vector;
 using std::cout;
 using std::endl;
@@ -23,56 +26,56 @@ void operator delete(void * ptr){
 
 class SlidingPuzzleSolver{
 private:
-    class _GridNode{
+    class GridNode{
         private:
             friend SlidingPuzzleSolver;
-            friend std::ostream& operator<<(std::ostream& os, const _GridNode& node){
+            friend std::ostream& operator<<(std::ostream& os, const GridNode& node){
                 return os << node.val;
             };
-            _GridNode *up, *right, *down, *left;
+            GridNode *up, *right, *down, *left;
             int val;
         public:
-            explicit _GridNode(int val=-1, _GridNode* up= nullptr, _GridNode* right= nullptr, _GridNode* down= nullptr, _GridNode* left= nullptr)
+            explicit GridNode(int val=-1, GridNode* up= nullptr, GridNode* right= nullptr, GridNode* down= nullptr, GridNode* left= nullptr)
                 : val(val), up(up), right(right), down(down), left(left) {};
 
-            _GridNode (const _GridNode& orig): val(orig.val), up(orig.up), right(orig.right), down(orig.down), left(orig.left) {
-                cout << orig.val << " was copied!" << endl;
+            GridNode (const GridNode& orig): val(orig.val), up(orig.up), right(orig.right), down(orig.down), left(orig.left) {
+                //cout << orig.val << " was copied!" << endl;
             };
 
-            _GridNode(_GridNode&& src) noexcept
+            GridNode(GridNode&& src) noexcept
                 : val(std::exchange(src.val, -1)),
                   up(std::exchange(src.up, nullptr)), right(std::exchange(src.right, nullptr)),
                   down(std::exchange(src.down, nullptr)), left(std::exchange(src.left, nullptr)){
-                cout << this->val << " was moved!" << endl;
+                //cout << this->val << " was moved!" << endl;
             }
 
     };
     enum direction{UP=0, DOWN, LEFT, RIGHT};
 private:
     const std::vector<std::vector<int>>& _arr;
-    std::map<int, _GridNode> _lookup;
+    std::unordered_map<int, GridNode> _lookup;
     std::vector<int> _movelist;
-    _GridNode *_p_entry_point;
+    GridNode * _p_entry_point;
     const uint _map_size;
 private:
     void _print_board(const std::string& end_dec = "=============") const{
-        _GridNode* row_head = _p_entry_point, *item=nullptr;
+        GridNode* row_head = _p_entry_point, *item;
         while(row_head) {
             item = row_head;
             while (item){
-                cout << item->val << " ";
+                cout << item->val << "\t";
                 item = item->right;
             }
-            cout << endl;
+            cout << "\n";
             row_head = row_head->down;
         }
         cout << end_dec << endl;
     }
     void _create_map() {
-        _GridNode *node_before=nullptr, *node_above=nullptr;
+        GridNode *node_before=nullptr, *node_above=nullptr;
         for (const auto& row_it : _arr){
             for (const int& item : row_it){
-                _lookup.emplace( item, std::move(_GridNode(item, node_above, nullptr, nullptr, node_before)));
+                _lookup.emplace( item, std::move(GridNode(item, node_above, nullptr, nullptr, node_before)));
                 if (node_before) {
                     node_before->right = &_lookup.at(item);
                 }
@@ -98,23 +101,20 @@ private:
         temp_0.key() = x;
         temp_x.key() = 0;
 
-        //use iterators to make node re-insertion constant time
-        auto insert_before = ++_lookup.begin();
-        _lookup.insert(insert_before, std::move(temp_0)); //O(1) when told where to insert before
-        std::advance(insert_before, x);     // O(1) operation
-        _lookup.insert(insert_before, std::move(temp_x));
+        //put 'em back w/o copying them
+        _lookup.insert(std::move(temp_0));
+        _lookup.insert(std::move(temp_x));
 
     }
 
     bool _swap_zero_with(const int& x) {
-        _swap(x);
-        if (_p_entry_point == &_lookup.at(x))
-            _p_entry_point = &_lookup[0];
-        else if (_p_entry_point == &_lookup.at(0))
-            _p_entry_point = &_lookup[x];
-        _movelist.emplace_back(x);
-
-        return true;
+        const auto& chk = _lookup.at(0);
+        if ((chk.up && chk.up->val==x) || (chk.right && chk.right->val==x) \
+            || (chk.down && chk.down->val==x) || (chk.left && chk.left->val==x))
+            _swap(x);
+        if (chk.val)
+            _movelist.emplace_back(x);
+        return chk.val;
     }
 
 public:
@@ -127,27 +127,25 @@ public:
 
     std::vector<int> solve(){
         _print_board();
-        assert(_swap_zero_with(8) && "X is not adjacent to 0.\n");
+      /*  if (!_swap_zero_with(8))
+            cout << "X is not adjacent to 0.\n";
         _print_board();
 
-        assert(_swap_zero_with(2)&& "X is not adjacent to 0.\n");
+        if(!_swap_zero_with(2))
+            cout << "X is not adjacent to 0.\n";
         _print_board();
 
-        assert(_swap_zero_with(4)&& "X is not adjacent to 0.\n");
+        if(!_swap_zero_with(4))
+            cout << "X is not adjacent to 0.\n";
         _print_board();
 
-        assert(_swap_zero_with(1)&& "X is not adjacent to 0.\n");
-        _print_board();
+        if (!_swap_zero_with(5))
+            cout << "X is not adjacent to 0.\n";
+        _print_board();*/
 
         return _movelist;
     }
 };
-
-
-
-
-
-
 
 std::vector<int> slide_puzzle(const std::vector<std::vector<int>> &arr)
 {
@@ -156,14 +154,46 @@ std::vector<int> slide_puzzle(const std::vector<std::vector<int>> &arr)
 }
 
 
-int main() {
-    vector<vector<int>> board_3x3 = {{4,1,3},
-                                    {2,8,0},
-                                    {7,6,5}};
-    auto movelist = slide_puzzle(board_3x3);
-    for (auto move : movelist){
-        cout << "Swapped 0 with " << move << endl;
+vector<vector<int>> create_random_board(int size=0){
+    uint length_of_square = size < 11 && size > 2? size : 3 + std::rand() % 8;
+    uint num_choices = length_of_square * length_of_square;
+    vector<vector<int>> board;
+    vector<int> validrange;
+
+    for (int i=0; i < length_of_square; i++)
+        board.emplace_back(vector<int>());
+
+    for (int i=0; i < num_choices; i++)
+        validrange.emplace_back(i);
+
+    int counter = 0, rand_position, rand_int;
+    while (!validrange.empty()){
+        rand_position = std::rand() % validrange.size();
+        rand_int = validrange[rand_position];
+        board[counter % length_of_square].emplace_back(rand_int);
+        auto it = validrange.begin();
+        std::advance(it, rand_position);
+        validrange.erase(it);
+        ++counter;
     }
+
+    return board;
+}
+
+int main() {
+    std::srand(std::time(nullptr)); //"ok, psuedo-random," but its fine for this..."
+    auto board1 = create_random_board();
+    auto movelist1 = slide_puzzle(board1);
+
+    auto board2 = create_random_board();
+    auto movelist2 = slide_puzzle(board2);
+
+    auto board3 = create_random_board();
+    auto movelist3 = slide_puzzle(board3);
+
+    /*){
+        cout << "Swapped 0 with " << move << endl;
+    }*/
     std::cin.get();
     return 0;
 }
