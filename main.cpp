@@ -4,7 +4,8 @@
 #include <ctime>
 #include <cstdlib>
 #include <iterator>
-
+#include <tuple>
+#include <functional>
 
 using std::vector;
 using std::cout;
@@ -24,7 +25,7 @@ void operator delete(void * ptr){
 #endif
 
 class SlidingPuzzleSolver{
-private:
+private:    // Private Classes, Structs, & Enums
     class GridNode{
         private:
             friend SlidingPuzzleSolver;
@@ -51,14 +52,16 @@ private:
 
     };
     enum direction{NONE=-1, UP, DOWN, LEFT, RIGHT};
-private:
+
+private:    // Private Fields
     const std::vector<std::vector<int>>& _arr;
     std::vector<std::vector<GridNode*>> _grid;
     std::unordered_map<int, GridNode> _quick_lookup;
     std::vector<int> _movelist;
     GridNode * _p_entry_point;
     const uint _map_size;
-private:
+
+private:    // Private Functions
     void _print_board(const std::string& end_dec = "=============") const{
         GridNode* row_head = _p_entry_point, *item;
         while(row_head) {
@@ -104,13 +107,6 @@ private:
         _quick_lookup.at(0).val = x;
         _quick_lookup.at(x).val = 0;
         
-/*        //swap nodes' row & col fields
-        int temp_col = _quick_lookup.at(0).col, temp_row = _quick_lookup.at(0).row;  
-        _quick_lookup.at(0).row = _quick_lookup.at(x).row;
-        _quick_lookup.at(0).col = _quick_lookup.at(x).col;
-        _quick_lookup.at(x).row = temp_row;
-        _quick_lookup.at(x).row = temp_col;*/
-        
         //temporarily extract nodes & swap their placements in map
         auto temp_x = _quick_lookup.extract(x), temp_0 = _quick_lookup.extract(0);
         temp_0.key() = x;
@@ -121,7 +117,70 @@ private:
         _quick_lookup.insert(std::move(temp_x));
 
     }
+    void _move_zero_to_x(int x, int avoid=-1){
+        if (x <= _quick_lookup.at(0).val || !_quick_lookup.at(x).movable)
+            return;
+        GridNode *empty_space, *node_x;
 
+        int desired_row = _quick_lookup.at(x).row, desired_col = _quick_lookup.at(x).col;
+        while (true){   // exits when 0 has been moved to spot where X was originally
+            empty_space = &_quick_lookup.at(0);
+            node_x = &_quick_lookup.at(x);
+            if (empty_space->row == desired_row && empty_space->col == desired_col)
+                break; //exit logic
+
+            // horizontal movement logic
+            if (empty_space->col != desired_col) {
+                //CASE 0 is LEFT of X
+                if (empty_space->col < node_x->col)
+                    if (empty_space->right && empty_space->right->val != avoid && empty_space->right->movable)
+                        empty_space = _swap_zero_with(empty_space->right->val);
+                    else {
+                        std::tuple path1{DOWN, RIGHT, RIGHT, UP};
+                        std::tuple path2{ UP,   RIGHT, RIGHT, DOWN};
+                        std::tuple path3{DOWN, RIGHT};
+                        std::tuple path4{UP,   RIGHT};
+                        empty_space = _apply_detour(path1, path2, path3, path4);
+                    }
+                else    //CASE 0 is RIGHT of X
+                if (empty_space->left && empty_space->left->val != avoid && empty_space->left->movable)
+                    empty_space = _swap_zero_with(empty_space->left->val);
+                else {
+                    std::tuple path1{DOWN, LEFT, LEFT, UP};
+                    std::tuple path2{ UP,   LEFT, LEFT, DOWN};
+                    std::tuple path3{DOWN, LEFT};
+                    std::tuple path4{UP,   LEFT};
+                    empty_space = _apply_detour(path1, path2, path3, path4);
+                }
+            }
+
+            // vertical movement logic
+            if (empty_space->row != desired_row) {
+                //CASE 0 is ABOVE X
+                if (empty_space->row < node_x->row)
+                    if (empty_space->down && empty_space->down->val != avoid && empty_space->down->movable)
+                        empty_space = _swap_zero_with(empty_space->down->val);
+                    else {
+                        std::tuple path1{RIGHT, DOWN, DOWN, LEFT};
+                        std::tuple path2{LEFT, DOWN, DOWN, RIGHT};
+                        std::tuple path3{RIGHT, DOWN};
+                        std::tuple path4{LEFT, DOWN};
+                        empty_space = _apply_detour(path1, path2, path3, path4);
+                    }
+                else    //CASE 0 is BELOW X
+                if (empty_space->up && empty_space->up->val != avoid && empty_space->up->movable)
+                    empty_space = _swap_zero_with(empty_space->up->val);
+                else {
+                    std::tuple path1{RIGHT, UP, UP, LEFT};
+                    std::tuple path2{LEFT, UP, UP, RIGHT};
+                    std::tuple path3{RIGHT, UP};
+                    std::tuple path4{LEFT, UP};
+                    empty_space = _apply_detour(path1, path2, path3, path4);
+                }
+            }
+
+        }
+    }
     GridNode* _swap_zero_with(const int x) {
         if (!x || !_quick_lookup.at(x).movable)
             return &_quick_lookup.at(0);
@@ -131,20 +190,199 @@ private:
             || (chk.down && chk.down->val==x) || (chk.left && chk.left->val==x))
             _swap(x);
         if (chk.val) {
-            _movelist.emplace_back(x);
+            if (!_movelist.empty() && _movelist.back() == x)
+                _movelist.pop_back();
+            else
+                _movelist.emplace_back(x);
             _print_board();
         }
         return &_quick_lookup.at(0);
     }
+    GridNode* _move_x_in_dir(int x, enum direction direction){
+        GridNode * x_adjacent;
+        switch(direction){
+            case RIGHT:
+                x_adjacent = _quick_lookup.at(x).right;
+                break;
+            case DOWN:
+                x_adjacent = _quick_lookup.at(x).down;
+                break;
+            case UP:
+                x_adjacent = _quick_lookup.at(x).up;
+                break;
+            case LEFT:
+                x_adjacent = _quick_lookup.at(x).left;
+                break;
+            default: return &_quick_lookup.at(0);
+        }
 
-    int _get_distance_between(const GridNode* start, const GridNode* end) const{
-        int col_diff = std::abs(start->col - end->col);
-        int row_diff = std::abs(start->row - end->row);
-        return std::abs(row_diff) + std::abs(col_diff);
+        if (!x_adjacent)
+            return &_quick_lookup.at(0);
+
+        _move_zero_to_x(x_adjacent->val, x);
+        return _swap_zero_with(_quick_lookup.at(x).val);
+
+    }
+    enum direction determine_move_dir(int start, int end, enum direction orientation){
+        if (orientation <= NONE)
+            return NONE;
+
+        int start_row = _quick_lookup.at(start).row;
+        int end_row = _quick_lookup.at(end).row;
+        int start_col = _quick_lookup.at(start).col;
+        int end_col = _quick_lookup.at(end).col;
+
+        if (orientation < LEFT) {
+            if (end_row - start_row < 0)
+                return UP;
+            else if (end_row - start_row > 0)
+                return DOWN;
+        }else {
+            if (end_col - start_col < 0)
+                return LEFT;
+            else if (end_col - start_col > 0)
+                return RIGHT;
+        }
+        return NONE;
+    };
+
+    void _solve_row(int row_num){
+        GridNode * empty_space;
+        enum direction dir;
+        uint desired_row, desired_col;
+        for (uint i=0, num = row_num * _arr.size() + 1; i < _arr.size(); i++, num++){
+            if (!_quick_lookup.at(num).movable)
+                continue;
+            desired_row = (num-1) / _arr.size();
+            desired_col = (num-1) % _arr.size();
+
+            // Put 2nd-to-last in row in rightmost spot
+            if (desired_col == _arr.size() - 2) {
+                ++desired_col;
+                if (_grid[desired_row][_arr.size()-2]->val == num) {
+                    for (int j = 0; j < 2; j++)
+                        empty_space = _move_x_in_dir(_quick_lookup.at(num).val, DOWN);
+                }
+                if (_grid[desired_row][_arr.size()-2]->val == num+1 || _grid[desired_row][_arr.size()-1]->val == num+1) {
+                    for (int j = 0; j < 2; j++)
+                        empty_space = _move_x_in_dir(_quick_lookup.at(num+1).val, DOWN);
+                }
+            }
+                // Put last-in-row underneath 2nd-to-last
+            else if (desired_col == _arr.size()) {
+                desired_col--;
+                desired_row++;
+            }
+
+            while ((dir = determine_move_dir(num, _grid[desired_row][desired_col]->val, LEFT)) > NONE){
+                _move_x_in_dir(num, dir);
+            }
+            while ((dir = determine_move_dir(num, _grid[desired_row][desired_col]->val, UP)) > NONE) {
+                _move_x_in_dir(num, dir);
+            }
+
+            if (desired_col < _arr.size()-2)
+                _quick_lookup.at(num).movable = false;
+
+            desired_col = (num-1) % _arr.size();
+            desired_row = (num-1) / _arr.size();
+            if (desired_col == _arr.size() -1){
+                for (int j = 0;; ++j) {
+                    if (_grid[desired_row][desired_col]->val == num){
+                        _quick_lookup.at(num).movable = false;
+                        _quick_lookup.at(num).left->movable = false;
+                        break;
+                    }
+                    empty_space = &_quick_lookup.at(0);
+                    switch (j % 4) {
+                        case 0:
+                            _swap_zero_with(empty_space->up->val);
+                            break;
+                        case 1:
+                            _swap_zero_with(empty_space->right->val);
+                            break;
+                        case 2:
+                            _swap_zero_with(empty_space->down->val);
+                            break;
+                        case 3:
+                            _swap_zero_with(empty_space->left->val);
+                            break;
+                    }
+                }
+            }
+        }
     }
 
+    void _solve_column(int col_num){
+        GridNode * empty_space;
+        enum direction dir;
+        uint desired_row, desired_col;
+        for (uint num = col_num * _arr.size() + 1; num < _map_size; num+=_arr.size()){
+            if (!_quick_lookup.at(num).movable)
+                continue;
+            desired_row = (num-1) / _arr.size();
+            desired_col = (num-1) % _arr.size();
 
-    template<typename D>
+            // Put 2nd-to-last in row in bottom-most spot
+            if (desired_row == _arr.size() - 2) {
+                ++desired_row;
+                if (_grid[_arr.size()-2][desired_col]->val == num) {
+                    for (int j = 0; j < 2; j++)
+                        empty_space = _move_x_in_dir(_quick_lookup.at(num).val, RIGHT);
+                }
+                if (_grid[_arr.size()-2][desired_col]->val == num+_arr.size() || _grid[_arr.size() - 1][desired_col]->val == num+_arr.size()) {
+                    for (int j = 0; j < 2; j++)
+                        empty_space = _move_x_in_dir(_quick_lookup.at(num+_arr.size()).val, RIGHT);
+                }
+            }
+                // Put last-in-row to the right of 2nd-to-last
+            else if (desired_row == _arr.size()) {
+                desired_col++;
+                desired_row--;
+            }
+
+            while ((dir = determine_move_dir(num, _grid[desired_row][desired_col]->val, DOWN)) > NONE) {
+                _move_x_in_dir(num, dir);
+            }
+            while ((dir = determine_move_dir(num, _grid[desired_row][desired_col]->val, RIGHT)) > NONE){
+                _move_x_in_dir(num, dir);
+            }
+
+
+            if (desired_row < _arr.size()-2)
+                _quick_lookup.at(num).movable = false;
+
+            desired_col = (num-1) % _arr.size();
+            desired_row = (num-1) / _arr.size();
+            if (desired_row == _arr.size() -1){
+                for (int j = 0;; ++j) {
+                    if (_grid[desired_row][desired_col]->val == num){
+                        _quick_lookup.at(num).movable = false;
+                        _quick_lookup.at(num).up->movable = false;
+                        break;
+                    }
+                    empty_space = &_quick_lookup.at(0);
+                    switch (j % 4) {
+                        case 0:
+                            _swap_zero_with(empty_space->down->val);
+                            break;
+                        case 1:
+                            _swap_zero_with(empty_space->left->val);
+                            break;
+                        case 2:
+                            _swap_zero_with(empty_space->up->val);
+                            break;
+                        case 3:
+                            _swap_zero_with(empty_space->right->val);
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
+private: // Recursive Private Template Functions
+    template<typename D>    //*Base Case
     bool _explore_path(GridNode* start, D direction){
         if (!start || !start->movable)
             return false;
@@ -189,231 +427,84 @@ private:
         } return _explore_path(explorer, directions...);
     }
 
-    void _move_zero_to_x(int x, int avoid=-1){
-        // TODO: CLEAN UP THIS FUNCTION
-        //  - Make helper function that can make a series of moves given
-        //      a set of enum directions
-        if (x <= _quick_lookup.at(0).val || !_quick_lookup.at(x).movable)
-            return;
-        GridNode *empty_space, *node_x;
-
-        int desired_row = _quick_lookup.at(x).row, desired_col = _quick_lookup.at(x).col;
-        while (true){   // exits when 0 has been moved to spot where X was originally
-            empty_space = &_quick_lookup.at(0);
-            node_x = &_quick_lookup.at(x);
-            if (empty_space->row == desired_row && empty_space->col == desired_col)
-                break; //exit logic
-
-            // horizontal movement logic
-            if (empty_space->col != desired_col) {
-                //CASE 0 is LEFT of X
-                if (empty_space->col < node_x->col)
-                    if (empty_space->right && empty_space->right->val != avoid && empty_space->right->movable)
-                        empty_space = _swap_zero_with(empty_space->right->val);
-                    else {
-                        if (_explore_path(empty_space, DOWN, RIGHT, RIGHT, UP)) {
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                        }
-                        else if (_explore_path(empty_space, UP, RIGHT, RIGHT, DOWN)) {
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                        }
-                        else if (_explore_path(empty_space, DOWN, RIGHT)){
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                        }
-                        else if (_explore_path(empty_space, UP, RIGHT)){
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                        }
-                    }
-                else    //CASE 0 is RIGHT of X
-                    if (empty_space->left && empty_space->left->val != avoid && empty_space->left->movable)
-                        empty_space = _swap_zero_with(empty_space->left->val);
-                    else {
-                        if (_explore_path(empty_space, DOWN, LEFT, LEFT, UP)) {
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                        }
-                        else if (_explore_path(empty_space, UP, LEFT, LEFT, DOWN)) {
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                        }
-                        else if (_explore_path(empty_space, DOWN, LEFT)){
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                        }
-                        else if (_explore_path(empty_space, UP, LEFT)){
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                        }
-                    }
-            }
-
-            // vertical movement logic
-            if (empty_space->row != desired_row) {
-                //CASE 0 is ABOVE X
-                if (empty_space->row < node_x->row)
-                    if (empty_space->down && empty_space->down->val != avoid && empty_space->down->movable)
-                        empty_space = _swap_zero_with(empty_space->down->val);
-                    else {
-                        if (_explore_path(empty_space, RIGHT, DOWN, DOWN, LEFT)) {
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                        }
-                        else if (_explore_path(empty_space, LEFT, DOWN, DOWN, RIGHT)) {
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                        }
-                        else if (_explore_path(empty_space, RIGHT, DOWN)){
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                        }
-                        else if (_explore_path(empty_space, LEFT, DOWN)){
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->down->val);
-                        }
-                    }
-                else    //CASE 0 is BELOW X
-                    if (empty_space->up && empty_space->up->val != avoid && empty_space->up->movable)
-                        empty_space = _swap_zero_with(empty_space->up->val);
-                    else {
-                        if (_explore_path(empty_space, RIGHT, UP, UP, LEFT)) {
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                        }
-                        else if (_explore_path(empty_space, LEFT, UP, UP, RIGHT)) {
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                        }
-                        else if (_explore_path(empty_space, RIGHT, UP)){
-                            empty_space = _swap_zero_with(empty_space->right->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                        }
-                        else if (_explore_path(empty_space, LEFT, UP)){
-                            empty_space = _swap_zero_with(empty_space->left->val);
-                            empty_space = _swap_zero_with(empty_space->up->val);
-                        }
-                    }
-            }
-            
-        }
-
-/*
-        //TODO: fix collision logic blocks to move 0 *around* avoid
-
-        // Row switching logic
-        if (_quick_lookup.at(0).row < _quick_lookup.at(x).row)
-            do { //collision logic
-                if (_quick_lookup.at(0).down && _quick_lookup.at(0).down->val == avoid){
-                    if (_quick_lookup.at(0).right)
-                        _swap_zero_with(_quick_lookup.at(0).right->val);
-                    else
-                        _swap_zero_with(_quick_lookup.at(0).left->val);
-                }
-                _swap_zero_with(_quick_lookup.at(0).down->val);
-            } while (_quick_lookup.at(0).row < _quick_lookup.at(x).row && _quick_lookup.at(0).down);
-        else
-            do { //collision logic
-                if (_quick_lookup.at(0).up && _quick_lookup.at(0).up->val == avoid){
-                    if (_quick_lookup.at(0).right)
-                        _swap_zero_with(_quick_lookup.at(0).right->val);
-                    else
-                        _swap_zero_with(_quick_lookup.at(0).left->val);
-                }
-                _swap_zero_with(_quick_lookup.at(0).up->val);
-            } while (_quick_lookup.at(x).row < _quick_lookup.at(0).row);
-
-        // Column switching logic
-        if (_quick_lookup.at(0).col < _quick_lookup.at(x).col)
-            do { //collision logic
-                if (_quick_lookup.at(0).right && _quick_lookup.at(0).right->val == avoid){
-                    if (_quick_lookup.at(0).down)
-                        _swap_zero_with(_quick_lookup.at(0).down->val);
-                    else
-                        _swap_zero_with(_quick_lookup.at(0).up->val);
-                }
-                _swap_zero_with(_quick_lookup.at(0).right->val);
-            } while (_quick_lookup.at(0).col < _quick_lookup.at(x).col && _quick_lookup.at(0).right);
-        else
-            do { //collision logic
-                if (_quick_lookup.at(0).left && _quick_lookup.at(0).left->val == avoid){
-                    if (_quick_lookup.at(0).down)
-                        _swap_zero_with(_quick_lookup.at(0).down->val);
-                    else
-                        _swap_zero_with(_quick_lookup.at(0).up->val);
-                }
-                _swap_zero_with(_quick_lookup.at(0).up->val);
-            } while (_quick_lookup.at(x).col < _quick_lookup.at(0).col);
-*/
-
-    }
-
-    GridNode* _move_x_in_dir(int x, enum direction direction){
-        GridNode * x_adjacent;
+    template<typename D> //*Base Case
+    GridNode * _move_along_path(D direction){
+        GridNode * explorer, *start = &_quick_lookup.at(0);
         switch(direction){
             case RIGHT:
-                x_adjacent = _quick_lookup.at(x).right;
+                explorer = start->right;
                 break;
             case DOWN:
-                x_adjacent = _quick_lookup.at(x).down;
+                explorer = start->down;
                 break;
             case UP:
-                x_adjacent = _quick_lookup.at(x).up;
+                explorer = start->up;
                 break;
             case LEFT:
-                x_adjacent = _quick_lookup.at(x).left;
+                explorer = start->left;
                 break;
-            default: return &_quick_lookup.at(0);
-        }
-         
-        if (!x_adjacent)
-            return &_quick_lookup.at(0);
-
-        _move_zero_to_x(x_adjacent->val, x);
-        return _swap_zero_with(_quick_lookup.at(x).val);
-        
+            default: return start;
+        } return _swap_zero_with(explorer->val);
     }
 
-    enum direction determine_move_dir(int start, int end, enum direction orientation){
-        if (orientation <= NONE)
-            return NONE;
-
-        int start_row = _quick_lookup.at(start).row;
-        int end_row = _quick_lookup.at(end).row;
-        int start_col = _quick_lookup.at(start).col;
-        int end_col = _quick_lookup.at(end).col;
-
-        if (orientation < LEFT) {
-            if (end_row - start_row < 0)
-                return UP;
-            else if (end_row - start_row > 0)
-                return DOWN;
-        }else {
-            if (end_col - start_col < 0)
-                return LEFT;
-            else if (end_col - start_col > 0)
-                return RIGHT;
+    template<typename D, typename... Ds>
+    GridNode * _move_along_path(D direction, Ds... directions){
+        GridNode * explorer, *start = &_quick_lookup.at(0);
+        switch(direction){
+            case RIGHT:
+                explorer = start->right;
+                break;
+            case DOWN:
+                explorer = start->down;
+                break;
+            case UP:
+                explorer = start->up;
+                break;
+            case LEFT:
+                explorer = start->left;
+                break;
+            default: return start;
         }
-        return NONE;
+        explorer = _swap_zero_with(explorer->val);
+        return _move_along_path(directions...);
+    }
+
+    template<typename T>    //*Base Case
+    GridNode * _apply_detour_path(T path){
+        GridNode * empty_space = &_quick_lookup.at(0);
+        auto explore = [this, &empty_space](const auto ...directions){
+            return _explore_path(empty_space, directions...);
+        };
+        auto move_along = [this](auto ...directions){
+            return _move_along_path(directions...);
+        };
+
+        if (std::apply(explore, path))
+            return std::apply(move_along, path);
+        return empty_space;
     };
+
+    template<typename T, typename... Ts>
+    GridNode * _apply_detour_path(T path, Ts ...paths){
+        GridNode * empty_space = &_quick_lookup.at(0);
+        auto explore = [this, &empty_space](const auto ...directions){
+            return _explore_path(empty_space, directions...);
+        };
+        auto move_along = [this](auto ...directions){
+            return _move_along_path(directions...);
+        };
+
+        if (std::apply(explore, path))
+            return std::apply(move_along, path);
+        return _apply_detour_path(paths...);
+    };
+
+private:    //Non-Recursive Template Functions
+    template<typename... Ts>
+    GridNode * _apply_detour(Ts... paths){
+        return _apply_detour_path(paths...);
+    }
+
 
 public:
     explicit SlidingPuzzleSolver (const std::vector<std::vector<int>>& arr)
@@ -425,26 +516,13 @@ public:
 
     std::vector<int> solve(){
         _print_board();
-        GridNode * s_entry_point = _p_entry_point;
-        enum direction dir;
-        uint desired_row, desired_col;
-        for (int num = 1; num < _map_size; ++num) {
-            desired_row = (num-1) / _arr.size();
-            desired_col = (num-1) % _arr.size();
-            if (desired_col == _arr.size() - 2)
-                ++desired_col;
-
-            while ((dir = determine_move_dir(num, _grid[desired_row][desired_col]->val, LEFT)) > NONE){
-                _move_x_in_dir(num, dir);
-            }
-            while ((dir = determine_move_dir(num, _grid[desired_row][desired_col]->val, UP)) > NONE) {
-                _move_x_in_dir(num, dir);
-            }
-            if (desired_col != _arr.size()-1)
-                _quick_lookup.at(num).movable = false;
+        // Methodical Solving
+        for (int num = 0; num < _arr.size()-2; ++num) {
+            _solve_row(num);
+            if (num < _arr.size()-3)
+                _solve_column(num);
         }
-
-
+        // TODO:Trial & Error solving for bottom right 3x2 rectangle
         return _movelist;
     }
 };
@@ -487,14 +565,14 @@ vector<vector<int>> create_random_board(int size=0){
 
 int main() {
     std::srand(std::time(nullptr)); //"ok, psuedo-random," but its fine for this..."
-    //auto board1 = create_random_board(4);
+    auto board1 = create_random_board(4);
     vector<vector<int>> board2 = {
             {14,      4,       11,      1},
             {12,      9,       8,       7},
             {10,      13,      15,      6},
             {5,       3,       2,       0}
     };
-    auto movelist1 = slide_puzzle(board2);
+    auto movelist1 = slide_puzzle(board1);
 
 /*    auto board2 = create_random_board();
     auto movelist2 = slide_puzzle(board2);
@@ -502,9 +580,6 @@ int main() {
     auto board3 = create_random_board();
     auto movelist3 = slide_puzzle(board3);*/
 
-    /*){
-        cout << "Swapped 0 with " << move << endl;
-    }*/
     std::cin.get();
     return 0;
 }
