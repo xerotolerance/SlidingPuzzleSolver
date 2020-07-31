@@ -1,1 +1,0 @@
-/usr/bin/c++.exe -g  -Wl,--enable-auto-import CMakeFiles/SlidingPuzzleSolver.dir/main.cpp.o  -o SlidingPuzzleSolver.exe -Wl,--out-implib,libSlidingPuzzleSolver.dll.a -Wl,--major-image-version,0,--minor-image-version,0 
