@@ -191,7 +191,7 @@ private:    // Private Functions
                 _movelist.pop_back();
             else
                 _movelist.emplace_back(x);
-            _print_board();
+            //_print_board();
         }
         return &_quick_lookup.at(0);
     }
@@ -398,6 +398,10 @@ private:    // Private Functions
                     _better_movement(num,_quick_lookup.at(num).down->down->val);
                 if (num + 1==_grid[row_num][col_num]->val || num + 1==_grid[row_num][col_num+1]->val)
                     _better_movement(num+1,_quick_lookup.at(num+1).down->down->val);
+
+                if (_quick_lookup.at(num).val == _grid[row_num+1][col_num]->val && _grid[row_num+1][col_num+1]->val == num + 1)
+                    _better_movement(num, _grid[row_num+1][col_num-1]->val);
+
                 _better_movement(num, _grid[row_num][col_num+1]->val, num+1, RIGHT);
                 if (_grid[row_num][col_num+1]->val == num /*&& _grid[row_num][col_num]->val!= num + 1*/) {
                     _quick_lookup.at(num).movable = false;
@@ -857,21 +861,24 @@ public: //Constructors & Destructors
 
 public: //Public Functions
     std::vector<int> solve(){
-        _print_board();
+        //_print_board();
 
 
         // Methodical Solving
-        //auto start = std::chrono::steady_clock::now();
+        /*auto start = std::chrono::steady_clock::now();*/
         for (int num = 0; num < _arr.size()-2; ++num) {
             _solve_row(num);
             if (num < _arr.size()-3){
                 _solve_column(num);
             }
         }
-        //auto end = std::chrono::steady_clock::now();
-        //auto elapsed = std::chrono::duration<double, std::milli>(end-start);
-        //cout << _arr.size() << "-by-" << _arr.size() << " puzzle solved in: " << elapsed.count() << "ms\n";
-        //_print_board();
+/*
+        auto end = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration<double, std::milli>(end-start);
+        _print_board();
+        cout << _arr.size() << "-by-" << _arr.size() << " puzzle solved in: " << elapsed.count() << "ms\n\n";
+*/
+
         // TODO:Trial & Error solving for bottom right 3x2 rectangle
 
 
@@ -937,7 +944,7 @@ void operator delete (void* ptr) noexcept {
 int main() {
     std::srand(std::time(nullptr)); //"ok, psuedo-random," but its fine for this..."
 
-#if 1
+#if 0
     vector<vector<int>> board2 = {
             {14,      4,       11,      1},
             {12,      9,       8,       7},
@@ -989,21 +996,22 @@ int main() {
             {8,6,5}
     };
 
-    /*slide_puzzle(problem_board1);   //success
-    slide_puzzle(problem_board2);   //success
-    slide_puzzle(problem_board3);   //success
-    slide_puzzle(problem_board4);   //success*/
-    slide_puzzle(problem_board5);   //FAILED
+    //slide_puzzle(problem_board1);   //SUCCESS
+    //slide_puzzle(problem_board2);   //SUCCESS
+    //slide_puzzle(problem_board3);   //SUCCESS
+    //slide_puzzle(problem_board4);   //SUCCESS
+    //slide_puzzle(problem_board5);   //SUCCESS
 #endif
-#if 0
-    int size=3, n=1000000;
+#if 1
+    int size=0, n=10000;
     auto start = std::chrono::steady_clock::now();
     for (int i=0; i < n; i++) {
         slide_puzzle(create_random_board(size));
     }
     auto end = std::chrono::steady_clock::now();
     double seconds_elapsed = std::chrono::duration<double, std::milli>(end-start).count();
-    cout << "Solved " << n << " puzzles of size " << size << "-by-" << size << "  in: " << seconds_elapsed << "ms.";
+    cout << "Solved " << n << " puzzles of size " << size << "-by-" << size << "  in: " << seconds_elapsed << "ms.\n";
+    cout << "Avg. time per "<< size << "-by-" << size <<" puzzle: " << seconds_elapsed/n << "ms.\n";
 #endif
     std::cin.get();
     return 0;
