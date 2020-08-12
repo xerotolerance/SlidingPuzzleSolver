@@ -1,3 +1,10 @@
+/*
+*  @author: CJ Maxwell
+*  @date: 2020-08-11
+*  @description: A solution to solve sliding puzzles coded in C++ (Clang 8 C++17) as detailed here:
+*      (https://www.codewars.com/kata/5a20eeccee1aae3cbc000090)
+*/
+
 #define _ITERATOR_DEBUG_LEVEL 0
 #include <iostream>
 #include <utility>
