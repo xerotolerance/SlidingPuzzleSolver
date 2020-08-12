@@ -4,8 +4,6 @@
 #include <vector>
 #include <unordered_map>
 #include <map>
-//#include <ctime>
-//#include <cstdlib>
 #include <iterator>
 #include <functional>
 #include <memory>
@@ -20,7 +18,6 @@ using std::unordered_map;
 using std::vector;
 using std::cout;
 using std::endl;
-
 
 
 class SlidingPuzzleSolver{
@@ -38,15 +35,11 @@ private:    //Local Datatypes
     public:
         explicit GridNode(int val=-1, int row=-1, int col=-1, std::shared_ptr<GridNode> up= nullptr, std::shared_ptr<GridNode> right= nullptr, std::shared_ptr<GridNode> down= nullptr, std::shared_ptr<GridNode> left= nullptr)
                 : val(val), row(row), col(col), up(std::move(up)), right(std::move(right)), down(std::move(down)), left(std::move(left)) {};
-        GridNode (const GridNode& orig): val(orig.val), row(orig.row), col(orig.col), up(orig.up), right(orig.right), down(orig.down), left(orig.left) {
-            //cout << orig.val << " was copied!" << endl;
-        };
+        GridNode (const GridNode& orig): val(orig.val), row(orig.row), col(orig.col), up(orig.up), right(orig.right), down(orig.down), left(orig.left) {};
         GridNode(GridNode&& src) noexcept
                 : val(std::exchange(src.val, -1)), row(std::exchange(src.row, -1)), col(std::exchange(src.col, -1)),
                   up(std::exchange(src.up, nullptr)), right(std::exchange(src.right, nullptr)),
-                  down(std::exchange(src.down, nullptr)), left(std::exchange(src.left, nullptr)){
-            //cout << this->val << " was moved!" << endl;
-        }
+                  down(std::exchange(src.down, nullptr)), left(std::exchange(src.left, nullptr)){}
     };
     class EndPuzzleSolverSingleton {
         class GraphNode{
@@ -177,7 +170,6 @@ private:    //Local Datatypes
             return state_count;
         }
         int rankNodes_recursive(GraphNode* head= nullptr, GraphNode* prev= nullptr){
-            //cout << head->key << "\n";
             int nodes_visited = 0;
             head = head ? head : win_node;
             head->depth = head->depth < 0 ? 0 : head->depth;
@@ -238,7 +230,6 @@ private:    //Local Datatypes
             return {0};
         }
         explicit EndPuzzleSolverSingleton(const State& start_state): win_state(generateWinState(start_state)), all_states(generateAllStates(this)) {
-            //cout << "Instantiated Singleton!\n";
             win_node = &all_states.at(GraphNode::stateToKey(win_state));
             win_node->depth=0;
             graph_size = linkStates();
@@ -311,9 +302,9 @@ private:    //Local Datatypes
             auto end_state = generateEndState(start_state);
             auto target_state = generateWinState(end_state);
 
-            // Transpose end state into base_end_state
-            // (do this to prevent having to hold multiple
-            //  state maps (720 gridnodes each) in memory at once).
+            /* Transpose end state into base_end_state
+             (do this to prevent having to hold multiple
+              state maps (720 gridnodes each) in memory at once). */
             for (auto& row : end_state){
                 for (auto& num : row) {
                     if (!num)
@@ -349,7 +340,7 @@ private:    //Local Datatypes
     };
     enum direction{NONE=-1, UP, DOWN, LEFT, RIGHT};
     using Grid = std::vector<std::vector<std::shared_ptr<GridNode>>>;
-  
+
 private:    // Private data members
     const State& _board;
     Grid _gridnodes_by_position;
@@ -508,8 +499,6 @@ private:    // Private Functions
                     }
                     if (_gridnodes_by_position[row_num][col_num + 1]->val == num) {
                         _gridnodes_by_value.at(num)->movable = false;
-                        /*if (num + 1==_gridnodes_by_position[row_num][col_num]->val)
-                            _move_recursive(num + 1, _gridnodes_by_value.at(num + 1)->down->down->val);*/
                     }
                 }
                 // STEP 6-8
@@ -635,8 +624,6 @@ private:    // Private Functions
                     }
                     if (_gridnodes_by_position[row_num + 1][col_num]->val == num) {
                         _gridnodes_by_value.at(num)->movable = false;
-                        /*if (num + static_cast<int>(_board.size())==_gridnodes_by_position[row_num][col_num]->val)
-                            _move_recursive(num + static_cast<int>(_board.size()), _gridnodes_by_value.at(num + static_cast<int>(_board.size()))->right->right->val);*/
                     }
                 }
                 // STEP 6-8
@@ -660,7 +647,6 @@ private:    // Private Functions
         auto end_state = gridToState(_gridnodes_by_position);
         const auto moves = EndPuzzleSolverSingleton::get().solve(end_state);
         if (!moves.empty() && moves.at(0)){
-            _movelist.insert(_movelist.end(), moves.begin(), moves.end());
             std::for_each(moves.begin(), moves.end(), [this](int move){_swap_zero_with(move);});
             for (const auto& row : end_state){
                 for (const auto& num : row)
@@ -771,7 +757,6 @@ private:    // Private Recursive Functions
     }
     std::shared_ptr<GridNode> _move_recursive(int move_me, int to_me, int reject_me= -1, enum direction orientation= NONE){
         if (move_me == to_me){
-            //cout << "No need to move " << move_me << ": " << to_me << " is already in place.\nSkipping...\n";
             return _gridnodes_by_value.at(0);
         }
 
@@ -920,12 +905,11 @@ private:    // Private Recursive Functions
                 path_from_empty_to_step.clear();
             }
         }
-        //cout << '\0';
         return empty_space;
     }
 
 private:    // Private Static Functions
-    static bool is_solved(vector<vector<std::shared_ptr<GridNode>>>& grid){
+    static bool is_solved(Grid& grid){
         for (int i=0; i < grid.size(); i++)
             for (int j=0; j < grid.at(i).size(); j++)
                 if (i==grid.size() - 1 && j==grid.at(i).size()-1)
@@ -992,37 +976,6 @@ private:    // Private Static Functions
 
 public:     // Public Static Functions
     static State create_random_board(int size=0, int min=3, int max=10){
-#if 0
-        std::srand(std::time(nullptr)); //"ok, psuedo-random," but its fine for this..."
-        unsigned int length_of_square = size < 11 && size > 2? size : 3 + std::rand() % 8;
-        unsigned int num_choices = length_of_square * length_of_square;
-        State board;
-        board.reserve(length_of_square);
-        vector<int> validrange;
-        validrange.reserve(num_choices);
-
-        for (int i=0; i < length_of_square; i++) {
-            board.emplace_back(vector<int>());
-            board.at(i).reserve(length_of_square);
-        }
-
-        for (int i=0; i < num_choices; i++)
-            validrange.emplace_back(i);
-
-        int row = 0, rand_position, rand_int;
-        while (!validrange.empty()){
-            rand_position = std::rand() % validrange.size();
-            rand_int = validrange[rand_position];
-
-            if (board[row].size() >= length_of_square)
-                ++row;
-            board[row].emplace_back(rand_int);
-
-            auto it = validrange.begin();
-            std::advance(it, rand_position);
-            validrange.erase(it);
-        }
-#endif
         static std::random_device rd;
         static std::default_random_engine re(rd());
         static std::uniform_int_distribution<int> sizeGen(min,max);
@@ -1052,7 +1005,23 @@ public:     // Public Static Functions
                 state[i][j] = grid[i][j]->val;
         return state;
     }
-    
+    static bool verifySolution(const vector<int>& movelist, SlidingPuzzleSolver& sps, bool show_steps= false){
+        if (show_steps)
+            sps._print_board();
+        for (const auto& move: movelist){
+            sps._swap_zero_with(move);
+            if (show_steps)
+                sps._print_board();
+        }
+        auto res = is_solved(sps._gridnodes_by_position);
+        if (show_steps) {
+            if (res)
+                cout << "Puzzle verified solved!\n";
+            else cout << "ERR Puzzle NOT in Solved State!\n";
+        }
+        return res;
+    }
+
 public:     //Constructors, Destructors, & Operators
     explicit SlidingPuzzleSolver (const State& arr, bool show_details=false)
       : _board(arr), _map_size(arr.size() * arr.size()), printAll(show_details)
@@ -1081,11 +1050,8 @@ public:     //Public Functions
 };
 
 std::vector<int> slide_puzzle(const vector<vector<int>> &arr){
-    //cout << "Evaluated:" << arr.size() << "-by-" << arr.size() << " puzzle\n\n";
-    SlidingPuzzleSolver sps = SlidingPuzzleSolver(arr, false);
-    //cout << sps << endl;
+    SlidingPuzzleSolver sps = SlidingPuzzleSolver(arr);
     auto res = sps.solve();
-    //cout << sps << "\n" << endl;
     return res;
 }
 
@@ -1104,31 +1070,24 @@ void operator delete (void* ptr) noexcept {
 
 int main() {
     // Kata Author provided test cases
-#if 0
-    std::vector<vector<vector<int>>> puzzles = {
-            {
-                    {4,1,3},
-                    {2,8,0},
-                    {7,6,5}
-            },
-            {
-                    {10, 3, 6, 4},
-                    { 1, 5, 8, 0},
-                    { 2,13, 7,15},
-                    {14, 9,12,11}
-            },
-            {
-                    { 3, 7,14,15,10},
-                    { 1, 0, 5, 9, 4},
-                    {16, 2,11,12, 8},
-                    {17, 6,13,18,20},
-                    {21,22,23,19,24}
-            }
-    };
+#if 1
+    std::vector<std::vector<std::vector<int>>> puzzles = {{
+      	{4,1,3},
+      	{2,8,0},
+      	{7,6,5}},
+       {{10, 3, 6, 4},
+      	{ 1, 5, 8, 0},
+      	{ 2,13, 7,15},
+      	{14, 9,12,11}},
+       {{ 3, 7,14,15,10},
+      	{ 1, 0, 5, 9, 4},
+      	{16, 2,11,12, 8},
+      	{17, 6,13,18,20},
+      	{21,22,23,19,24}}};
 
 for (const auto& puzzle : puzzles ) {
     auto sln = slide_puzzle(puzzle);
-
+    auto p = SlidingPuzzleSolver(puzzle);
     int i = 0;
     for (const auto &move : sln) {
         if (i == 0)
@@ -1139,12 +1098,14 @@ for (const auto& puzzle : puzzles ) {
         else cout << "}";
     }
     cout << "\n(" << sln.size() << " moves to solve state.)\n\n";
-    //std::cin.get();
+    if (SlidingPuzzleSolver::verifySolution(sln, p))
+        cout << "Solution verified!\n";
+    std::cin.get();
 }
 #endif
 
     // Problem Boards
-#if 1
+#if 0
     vector<vector<int>> board2 = {
             {14,      4,       11,      1},
             {12,      9,       8,       7},
